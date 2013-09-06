@@ -1,4 +1,4 @@
-function track_puncta(exp_dir,varargin)
+function track_cells(exp_dir,varargin)
 
 start_time = tic;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
