@@ -1,5 +1,5 @@
-function segment_cells(image_folder,varargin)
-% SEGMENT_CELLS    Segments cell bodies from N-cadherin images.
+function segment_cells(results_folder,varargin)
+% SEGMENT_CELLS    Segments cell bodies from E-cadherin images.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Option Processing
@@ -7,20 +7,23 @@ function segment_cells(image_folder,varargin)
 tic;
 i_p = inputParser;
 i_p.StructExpand = true;
-i_p.addRequired('image_folder',@(x)exist(x,'dir') == 7);
+i_p.addRequired('results_folder',@(x)exist(x,'dir') == 7);
 
-i_p.parse(image_folder,varargin{:});
+i_p.parse(results_folder,varargin{:});
 
 filenames = add_filenames_to_struct(struct());
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Main Program
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-image_filenames = dir(image_folder);
-image_filenames = image_filenames(3:end);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\
+image_folder = fullfile(results_folder,'images');
 
-for i_num = 1:length(image_filenames)
-    image = double(imread(fullfile(image_folder,image_filenames(i_num).name)));
+image_folder_nums = dir(image_folder);
+image_folder_nums = image_folder_nums(3:end);
+
+for i_num = 1:length(image_folder_nums)
+    this_image_folder = fullfile(results_folder,'images',image_folder_nums(i_num).name);
+    image = double(imread(fullfile(this_image_folder,filenames.raw_image)));
     
     %High-pass filtering
     I_filt = fspecial('disk',10);
@@ -36,7 +39,8 @@ for i_num = 1:length(image_filenames)
     cell_outlines = bwmorph(cell_outlines,'skel',Inf);
     cell_outlines = imdilate(cell_outlines,strel('disk',4));
     cell_outlines = bwmorph(cell_outlines,'skel',Inf);
-    
+     
+    %Get rid of unconnected line segments
     after = bwmorph(cell_outlines,'spur');
     while (not(all(all(cell_outlines == after))))
         cell_outlines = after;
@@ -46,12 +50,12 @@ for i_num = 1:length(image_filenames)
     cell_bodies_binary = not(cell_outlines);
     cell_bodies = bwlabel(cell_bodies_binary,4);
     
-%     %Filter objects/cell bodies at edge
-%     edge_pixels = [cell_bodies(1,:),cell_bodies(end,:), ...
-%         cell_bodies(:,1)',cell_bodies(:,end)'];
-%     edge_labels = nonzeros(unique(edge_pixels));
-%     not_edge_labels = nonzeros(setdiff(unique(cell_bodies(:)),edge_labels));
-%     cell_bodies = ismember(cell_bodies,not_edge_labels).*cell_bodies;
+    %Filter objects/cell bodies at edge
+    edge_pixels = [cell_bodies(1,:),cell_bodies(end,:), ...
+        cell_bodies(:,1)',cell_bodies(:,end)'];
+    edge_labels = nonzeros(unique(edge_pixels));
+    not_edge_labels = nonzeros(setdiff(unique(cell_bodies(:)),edge_labels));
+    cell_bodies = ismember(cell_bodies,not_edge_labels).*cell_bodies;
     
     %Filter small objects
     cell_props = regionprops(cell_bodies,'Area');
@@ -76,18 +80,13 @@ for i_num = 1:length(image_filenames)
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Results Output
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    output_dir = sprintf('../results/kiehart_testing/02/images/%05d',i_num);
-    if (not(exist(output_dir,'dir')))
-        mkdir(output_dir);
-    end
     
     image_norm = (image - min(image(:)))/range(image(:));
     highlighted_image = create_highlighted_image(image_norm,cell_bodies,'mix_percent',0.5);
-    imwrite(highlighted_image,fullfile(output_dir,'highlighted.png'));
+    imwrite(highlighted_image,fullfile(this_image_folder,'highlighted.png'));
     
-    imwrite(uint16(cell_bodies),fullfile(output_dir,filenames.objects));
-    imwrite(uint16(cell_bodies_perim),fullfile(output_dir,filenames.objects_perim));
-    imwrite(uint16(image),fullfile(output_dir,filenames.raw_image));
+    imwrite(uint16(cell_bodies),fullfile(this_image_folder,filenames.objects));
+    imwrite(uint16(cell_bodies_perim),fullfile(this_image_folder,filenames.objects_perim));
 end
 
 toc;
